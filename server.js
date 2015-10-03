@@ -6,7 +6,7 @@ var app     = express();
 var url = require('url');
 
 app.get('/api', function(req, res){
-	var body = "Assist scraper <br> <br> '/api' displays how to use api <br> '/api/getschools' displays the schools to transfer to <br> '/api/SCHOOLNAME/getmajors' displays majors from the SCHOOLNAME <br> '/api/SCHOOLNAME/MAJORNAME/getclasses' displays classes from MAJOR NAME of SCHOOLNAME <br>";
+	var body = "Assist scraper <br> <br> '/api' displays how to use api <br> '/api/getschools' displays the schools and SCHOOLVALUEs to transfer to <br> '/api/SCHOOLVALUE/getmajors' displays majors from the SCHOOLVALUE <br> '/api/SCHOOLVALUE/MAJORVALUE/getclasses' displays classes from MAJORVALUE of SCHOOLVALUE <br>";
 	res.send(body)
 });
 app.get('/api/getschools', function(req, res){
@@ -32,7 +32,8 @@ app.get('/api/getschools', function(req, res){
     		res.send(JSON.stringify(textArr));
 
 	    }else{
-	    	res.send('error with parse');
+	    	var err = {error:"Error with parsing"}
+			res.send(JSON.stringify(err))
 	    }
 	})
 })
@@ -43,6 +44,18 @@ app.get('/api/:school/getmajors', function(req, res){
 		if(!error){
 			var $ = cheerio.load(html);
 			var textArr = [];
+
+
+			$('#title').each(function(i, elem){
+					if($(this).text().indexOf("By Major") > -1){
+						if($(this).text().indexOf("Not Available") > -1){
+							var err2 = {error:"Major not available for this school"}
+							res.end(JSON.stringify(err2))
+							return;
+						}
+					}
+				
+			})
 
 			$('option').each(function(i , elem){
 				if( $(this).parent().attr('name') == 'dora' &&
@@ -55,17 +68,28 @@ app.get('/api/:school/getmajors', function(req, res){
 				}
 			})
 
-			res.send(JSON.stringify(textArr))
+			for(var z = 0; z < textArr.length; z++){
+				textArr[z].value = textArr[z].value.replace('/','*')
+			}
+			if(textArr.length>0){
+				res.send(JSON.stringify(textArr))
+			}else{
+				var err3 = {error:"Error with school name"}
+				res.send(JSON.stringify(err3))
+			}
+			
 		}else{
-			res.send('error with school name')
+			var err = {error:"Error with school name"}
+			res.send(JSON.stringify(err))
 		}
 	})
 });
 app.get('/api/:school/:dora/getclasses', function(req, res){
 	var school = req.params.school;
 	var dora = req.params.dora;
+	dora = dora.replace('*','%2F')
 	var url = 'http://www.assist.org/web-assist/report.do?agreement=aa&reportPath=REPORT_2&reportScript=Rep2.pl&event=19&dir=1&sia=DAC&ria='+school+'&ia=DAC&oia='+school+'&aay=15-16&ay=15-16&dora='+dora;
-
+	console.log(url)
 	request(url, function(error, response, html){
 		if(!error){
 			var $ = cheerio.load(html);
@@ -81,7 +105,7 @@ app.get('/api/:school/:dora/getclasses', function(req, res){
 					var text = $('body').text();
 					var n = text.match(/(\|\w*.)\w+/g);
 
-					
+
 					for(var v = 0; v < n.length; v++){
 						n[v] = n[v].substring(1);
 					}
@@ -89,11 +113,13 @@ app.get('/api/:school/:dora/getclasses', function(req, res){
 
 					res.send(n)
 				}else{
-					res.send('error with major name')
+						var err2 = {error:"Error with major name"}
+						res.send(JSON.stringify(err2))
 				}
 			});
 		}else{
-			res.send('error with class name')
+			var err = {error:"Error with school name"}
+			res.send(JSON.stringify(err))
 		}
 	})
 });
