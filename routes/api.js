@@ -5,10 +5,13 @@ var cheerio = require('cheerio');
 var app     = express.Router();
 var url = require('url');
 
+//displays how to use api
 app.get('/', function(req, res){
 	var body = "Assist scraper <br> <br> '/api' displays how to use api <br> '/api/schools' displays the schools and SCHOOLVALUEs to transfer to <br> '/api/SCHOOLVALUE/majors' displays majors from the SCHOOLVALUE <br> '/api/SCHOOLVALUE/MAJORVALUE/classes' displays classes from MAJORVALUE of SCHOOLVALUE <br>";
 	res.send(body);
 });
+
+//displays the schools available to transfer to by going to the assist website and parsing the options
 app.get('/schools', function(req, res){
  	url = 'http://www.assist.org/web-assist/DAC.html';
 	request(url, function(error, response, html){
@@ -37,6 +40,7 @@ app.get('/schools', function(req, res){
 	    }
 	});
 });
+//gets all of the majors by plugging the school value into a url then reading all of the options available
 app.get('/:school/majors', function(req, res){
 	var school = req.params.school;
 	var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1';
@@ -84,6 +88,7 @@ app.get('/:school/majors', function(req, res){
 		}
 	});
 });
+//gets all of the classes by plugging in the school value and major values into a url, then regex 2 words after a '|'
 app.get('/:school/:dora/classes', function(req, res){
 	var school = req.params.school;
 	var dora = req.params.dora;
@@ -123,7 +128,7 @@ app.get('/:school/:dora/classes', function(req, res){
 		}
 	});
 });
-
+//gets required text by plugging in html and regex
 function getRequiredCourses(body) {
 	var result = [];
 	var index = 0;
