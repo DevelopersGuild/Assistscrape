@@ -105,9 +105,10 @@ app.get('/api/:school/:dora/getclasses', function(req, res){
 					var text = $('body').text();
 					var n = text.match(/(\|\w*.)\w+/g);
 
-
+					console.log(n);
 					for(var v = 0; v < n.length; v++){
 						n[v] = n[v].substring(1);
+						console.log("substring: " + n[v]);
 					}
 
 
