@@ -9,7 +9,7 @@ app.get('/api', function(req, res){
 	var body = "Assist scraper <br> <br> '/api' displays how to use api <br> '/api/getschools' displays the schools and SCHOOLVALUEs to transfer to <br> '/api/SCHOOLVALUE/getmajors' displays majors from the SCHOOLVALUE <br> '/api/SCHOOLVALUE/MAJORVALUE/getclasses' displays classes from MAJORVALUE of SCHOOLVALUE <br>";
 	res.send(body);
 });
-app.get('/api/getschools', function(req, res){
+app.get('/api/schools', function(req, res){
  	url = 'http://www.assist.org/web-assist/DAC.html';
 	request(url, function(error, response, html){
 	    if(!error){
@@ -37,7 +37,7 @@ app.get('/api/getschools', function(req, res){
 	    }
 	});
 });
-app.get('/api/:school/getmajors', function(req, res){
+app.get('/api/:school/majors', function(req, res){
 	var school = req.params.school;
 	var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1';
 	request(url, function(error, response, html){
@@ -84,7 +84,7 @@ app.get('/api/:school/getmajors', function(req, res){
 		}
 	});
 });
-app.get('/api/:school/:dora/getclasses', function(req, res){
+app.get('/api/:school/:dora/classes', function(req, res){
 	var school = req.params.school;
 	var dora = req.params.dora;
 	dora = dora.replace('*','%2F');
@@ -102,14 +102,16 @@ app.get('/api/:school/:dora/getclasses', function(req, res){
 				if(!error){
 					var $ = cheerio.load(html);
 					var text = $('body').text();
-					var n = text.match(/(\|\w*.)\w+/g);
-
-					console.log(n);
-					for(var v = 0; v < n.length; v++){
-						n[v] = n[v].substring(1);
-						console.log("substring: " + n[v]);
+					var college_courses = text.match(/(\|\w*.)\w+/g);
+					for(var v = 0; v < college_courses.length; v++){
+						college_courses[v] = college_courses[v].substring(1);
 					}
-					res.send(n);
+					res.send({
+						"data": {
+							"required_courses": getRequiredCourses(text),
+							"articulated_courses": college_courses
+						}
+					});
 				}else{
 					var err2 = {error:"Error with major name"};
 					res.send(JSON.stringify(err2));
@@ -123,7 +125,27 @@ app.get('/api/:school/:dora/getclasses', function(req, res){
 });
 
 app.listen('8081');
-
 console.log('running on port 8081');
+
+function getRequiredCourses(body) {
+	var result = [];
+	var index = 0;
+	if (body) {
+		var lines = body.split('\n');
+		lines.forEach(function(entry) {
+			if (entry.match(/(\|\w*.)\w+/g)) {
+				re = /([a-z])\w+/;
+				matchedWords = re.exec(entry);
+				var rawCode = entry.substring(0, matchedWords.index - 2).trim();
+				rawCode = rawCode.replace(/[^a-zA-Z0-9\s]/g, '');
+				if (rawCode) {
+					result[index] = rawCode;
+					index++;
+				}
+			}
+		});
+	}
+	return result;
+}
 
 exports = module.exports = app;
