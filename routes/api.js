@@ -2,14 +2,14 @@ var express = require('express');
 var fs = require('fs');
 var request = require('request');
 var cheerio = require('cheerio');
-var app     = express();
+var app     = express.Router();
 var url = require('url');
 
-app.get('/api', function(req, res){
-	var body = "Assist scraper <br> <br> '/api' displays how to use api <br> '/api/getschools' displays the schools and SCHOOLVALUEs to transfer to <br> '/api/SCHOOLVALUE/getmajors' displays majors from the SCHOOLVALUE <br> '/api/SCHOOLVALUE/MAJORVALUE/getclasses' displays classes from MAJORVALUE of SCHOOLVALUE <br>";
+app.get('/', function(req, res){
+	var body = "Assist scraper <br> <br> '/api' displays how to use api <br> '/api/schools' displays the schools and SCHOOLVALUEs to transfer to <br> '/api/SCHOOLVALUE/majors' displays majors from the SCHOOLVALUE <br> '/api/SCHOOLVALUE/MAJORVALUE/classes' displays classes from MAJORVALUE of SCHOOLVALUE <br>";
 	res.send(body);
 });
-app.get('/api/schools', function(req, res){
+app.get('/schools', function(req, res){
  	url = 'http://www.assist.org/web-assist/DAC.html';
 	request(url, function(error, response, html){
 	    if(!error){
@@ -37,7 +37,7 @@ app.get('/api/schools', function(req, res){
 	    }
 	});
 });
-app.get('/api/:school/majors', function(req, res){
+app.get('/:school/majors', function(req, res){
 	var school = req.params.school;
 	var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1';
 	request(url, function(error, response, html){
@@ -84,7 +84,7 @@ app.get('/api/:school/majors', function(req, res){
 		}
 	});
 });
-app.get('/api/:school/:dora/classes', function(req, res){
+app.get('/:school/:dora/classes', function(req, res){
 	var school = req.params.school;
 	var dora = req.params.dora;
 	dora = dora.replace('*','%2F');
@@ -124,9 +124,6 @@ app.get('/api/:school/:dora/classes', function(req, res){
 	});
 });
 
-app.listen('8081');
-console.log('running on port 8081');
-
 function getRequiredCourses(body) {
 	var result = [];
 	var index = 0;
@@ -148,4 +145,4 @@ function getRequiredCourses(body) {
 	return result;
 }
 
-exports = module.exports = app;
+module.exports = app;
