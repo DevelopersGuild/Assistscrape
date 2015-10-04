@@ -7,7 +7,7 @@ var url = require('url');
 
 app.get('/api', function(req, res){
 	var body = "Assist scraper <br> <br> '/api' displays how to use api <br> '/api/getschools' displays the schools and SCHOOLVALUEs to transfer to <br> '/api/SCHOOLVALUE/getmajors' displays majors from the SCHOOLVALUE <br> '/api/SCHOOLVALUE/MAJORVALUE/getclasses' displays classes from MAJORVALUE of SCHOOLVALUE <br>";
-	res.send(body)
+	res.send(body);
 });
 app.get('/api/getschools', function(req, res){
  	url = 'http://www.assist.org/web-assist/DAC.html';
@@ -23,7 +23,7 @@ app.get('/api/getschools', function(req, res){
 	        		var tempvalue = $(this).attr('value');
 	        		var url = require("url");
 					var parts = url.parse(tempvalue, true);
-					tempvalue = parts.query['oia']
+					tempvalue = parts.query['oia'];
 	        	 	textArr.push( { school: tempschool, value: tempvalue});
 	        	}
 	        });
@@ -32,14 +32,14 @@ app.get('/api/getschools', function(req, res){
     		res.send(JSON.stringify(textArr));
 
 	    }else{
-	    	var err = {error:"Error with parsing"}
-			res.send(JSON.stringify(err))
+	    	var err = {error:"Error with parsing"};
+			res.send(JSON.stringify(err));
 	    }
-	})
-})
+	});
+});
 app.get('/api/:school/getmajors', function(req, res){
 	var school = req.params.school;
-	var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1'
+	var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1';
 	request(url, function(error, response, html){
 		if(!error){
 			var $ = cheerio.load(html);
@@ -49,13 +49,13 @@ app.get('/api/:school/getmajors', function(req, res){
 			$('#title').each(function(i, elem){
 					if($(this).text().indexOf("By Major") > -1){
 						if($(this).text().indexOf("Not Available") > -1){
-							var err2 = {error:"Major not available for this school"}
-							res.end(JSON.stringify(err2))
+							var err2 = {error:"Major not available for this school"};
+							res.end(JSON.stringify(err2));
 							return;
 						}
 					}
 				
-			})
+			});
 
 			$('option').each(function(i , elem){
 				if( $(this).parent().attr('name') == 'dora' &&
@@ -64,40 +64,39 @@ app.get('/api/:school/getmajors', function(req, res){
 					){
 					var dora = $(this).text();
 					var val = $(this).attr('value');
-					textArr.push( {major: dora + i, value:val})
+					textArr.push( {major: dora + i, value:val});
 				}
-			})
+			});
 
 			for(var z = 0; z < textArr.length; z++){
-				textArr[z].value = textArr[z].value.replace('/','*')
+				textArr[z].value = textArr[z].value.replace('/','*');
 			}
 			if(textArr.length>0){
-				res.send(JSON.stringify(textArr))
+				res.send(JSON.stringify(textArr));
 			}else{
-				var err3 = {error:"Error with school name"}
-				res.send(JSON.stringify(err3))
+				var err3 = {error:"Error with school name"};
+				res.send(JSON.stringify(err3));
 			}
 			
 		}else{
-			var err = {error:"Error with school name"}
-			res.send(JSON.stringify(err))
+			var err = {error:"Error with school name"};
+			res.send(JSON.stringify(err));
 		}
-	})
+	});
 });
 app.get('/api/:school/:dora/getclasses', function(req, res){
 	var school = req.params.school;
 	var dora = req.params.dora;
-	dora = dora.replace('*','%2F')
+	dora = dora.replace('*','%2F');
 	var url = 'http://www.assist.org/web-assist/report.do?agreement=aa&reportPath=REPORT_2&reportScript=Rep2.pl&event=19&dir=1&sia=DAC&ria='+school+'&ia=DAC&oia='+school+'&aay=15-16&ay=15-16&dora='+dora;
-	console.log(url)
+	console.log(url);
 	request(url, function(error, response, html){
 		if(!error){
 			var $ = cheerio.load(html);
 			var url2;
 			$('iframe').each(function(i, elem){
-				url2 = $(this).attr('src')
-
-			})
+				url2 = $(this).attr('src');
+			});
 
 			request(url2, function(error, response, html){
 				if(!error){
@@ -110,22 +109,20 @@ app.get('/api/:school/:dora/getclasses', function(req, res){
 						n[v] = n[v].substring(1);
 						console.log("substring: " + n[v]);
 					}
-
-
-					res.send(n)
+					res.send(n);
 				}else{
-						var err2 = {error:"Error with major name"}
-						res.send(JSON.stringify(err2))
+					var err2 = {error:"Error with major name"};
+					res.send(JSON.stringify(err2));
 				}
 			});
 		}else{
-			var err = {error:"Error with school name"}
-			res.send(JSON.stringify(err))
+			var err = {error:"Error with school name"};
+			res.send(JSON.stringify(err));
 		}
-	})
+	});
 });
 
-app.listen('8081')
+app.listen('8081');
 
 console.log('running on port 8081');
 
