@@ -67,7 +67,7 @@ app.get('/:school/majors', function(req, res)
 
 			$('option').each(function(i , elem)
 			{
-				if( $(this).parent().attr('name') == 'dora' &&
+				if($(this).parent().attr('name') == 'dora' &&
 					$(this).attr('value').length > 0 &&
 					$(this).attr('value') != '-1')
 				{
@@ -116,13 +116,12 @@ app.get('/:school/:dora/classes', function(req, res)
 		if(!error)
 		{
 			var $ = cheerio.load(html);
-			$('.aynote').each(function(i, elem)
+			$('input').each(function(i, elem)
 			{
-				var aynote = $(this).text().replace(/\s+/g,' ');
-				var found = aynote.indexOf("not available");
-				if (found > -1)
+				if($(this).parent().attr('name') == 'major' &&
+					$(this).attr('name') == 'aay')
 				{
-					aay = aynote.substring(found + 19, found + 24);
+					aay = $(this).attr('value');
 				}
 			});
 
