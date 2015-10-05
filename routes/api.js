@@ -145,18 +145,9 @@ app.get('/:school/:dora/classes', function(req, res)
 						if(!error){
 							var $ = cheerio.load(html);
 							var text = $('body').text();
-							var college_courses = text.match(/(\|\w*.)\w+/g);
-							for(var v = 0; v < college_courses.length; v++)
-							{
-								college_courses[v] = college_courses[v].substring(1);
-							}
 							res.send(
 							{
-								"data":
-								{
-									"required_courses": getRequiredCourses(text),
-									"articulated_courses": college_courses
-								}
+								"data": getCourses(text)
 							});
 						}
 						else
@@ -176,30 +167,110 @@ app.get('/:school/:dora/classes', function(req, res)
 	});
 });
 
-//gets required text by plugging in html and regex
-function getRequiredCourses(body) {
+function getCourses(text)
+{
+	text = text.replace(/  +/g, ' ');
 	var result = [];
-	var index = 0;
-	if (body)
+	var courses = [];
+	courses = text.match(/---([^-]+)\|([^-]+)---/g);
+
+	var from = true;
+	var fromCourse = '';
+	var toCourse = '';
+	courses.forEach(function(course)
 	{
-		var lines = body.split('\n');
-		lines.forEach(function(entry)
+		course = course.slice(3, -3);
+		for (var i = 0; i < course.length; ++i)
 		{
-			if (entry.match(/(\|\w*.)\w+/g))
+			if (course[i] == '|' || course[i] == '\n')
 			{
-				re = /([a-z])\w+/;
-				matchedWords = re.exec(entry);
-				var rawCode = entry.substring(0, matchedWords.index - 2).trim();
-				rawCode = rawCode.replace(/[^a-zA-Z0-9\s]/g, '');
-				if (rawCode)
-				{
-					result[index] = rawCode;
-					index++;
-				}
+				toCourse += ' ';
+				fromCourse += ' ';
+				from = !from;
 			}
-		});
-	}
+			else if (!from)
+			{
+				toCourse += course[i];
+			}
+			else if (from)
+			{
+				fromCourse += course[i];
+			}
+		}
+		result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
+		toCourse = '';
+		fromCourse = '';
+		from = !from;
+	});
 	return result;
+}
+
+function parseCourse(text)
+{
+	var notArticulated 	= 'no course articulated';
+	var notArticulated2 = 'not articulated';
+	var notArticulated3 = 'no comparable lab';
+
+	if (text.toLowerCase().indexOf(notArticulated) > -1 ||
+		text.toLowerCase().indexOf(notArticulated2) > -1 ||
+		text.toLowerCase().indexOf(notArticulated3) > -1)
+	{
+		return [];
+	}
+	var result = [];
+
+	var or = text.split('OR');
+	or.forEach(function(orSplit)
+	{
+		if (text.indexOf('OR') > -1)
+		{
+			result.push({ or: getOrSplitted(orSplit) });
+		}
+		else
+		{
+			result.push(getOrSplitted(orSplit));
+		}
+	});
+	return result;
+}
+
+function getOrSplitted(orSplit)
+{
+	var amp = orSplit.replace(/(.*&.*\([0-9]\).*)( [A-Z][A-Z]+.*\([0-9]\))/, '$1|$2')
+		.split('|');
+	var result = [];
+
+	amp.forEach(function(ampSplit)
+	{
+		if (orSplit.indexOf('&') > -1)
+		{
+			result.push({ and: getAmpSplitted(ampSplit) });
+		}
+		else
+		{
+			result.push(getAmpSplitted(ampSplit));
+		}
+	});
+	return result;
+}
+
+function getAmpSplitted(ampSplit)
+{
+	var ampRemovedSplit;
+	var unit;
+	var code;
+	var title;
+
+	ampRemovedSplit = ampSplit.replace('&', '');
+	unit = ampRemovedSplit.match(/(\([0-9]+\))/)[0].slice(1, -1);
+	code = ampRemovedSplit.match(/\w[a-zA-Z ]+ \d+\w*/)[0];
+	title = ampRemovedSplit.replace(unit, '')
+		.replace(code, '')
+		.replace(/[^\w\s]+/, ' ')
+		.replace(/\s\s+/g, ' ')
+		.trim();
+
+	return { code: code, title: title, unit: unit };
 }
 
 module.exports = app;
