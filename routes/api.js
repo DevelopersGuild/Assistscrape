@@ -8,28 +8,13 @@ var url 		= require('url');
 // Displays the schools available to transfer to from De Anza College.
 app.get('/schools', function(req, res)
 {
- 	url = 'http://www.assist.org/web-assist/DAC.html';
+ 	var url = 'http://www.assist.org/web-assist/DAC.html';
 
 	request(url, function(error, response, html)
 	{
     if(!error)
     {
-    	var $ = cheerio.load(html);
-			var schools = [];
-
-      $('option').each(function(i, elem)
-      {
-      	if($(this).parent().attr('id') == 'oia' && i != 188)
-      	{
-      		var school = $(this).text();
-      		school = school.replace('To:', '').trim();
-      		var value = $(this).attr('value');
-      		var url = require("url");
-					var parts = url.parse(value, true).query.oia;
-					value = parts.query.oia;
-      	 	schools.push( { school: school, value: value} );
-      	}
-      });
+			var schools = getSchools(html);
   		res.send(JSON.stringify(schools));
 
     }
@@ -51,36 +36,7 @@ app.get('/:school/majors', function(req, res)
 	{
 		if(!error)
 		{
-			var $ = cheerio.load(html);
-			var majors = [];
-
-			$('#title').each(function(i, elem)
-			{
-				if($(this).text().indexOf("By Major") > -1 &&
-					$(this).text().indexOf("Not Available") > -1)
-				{
-					var err2 = { error: "Major not available for this school" };
-					res.end(JSON.stringify(err2));
-					return;
-				}
-			});
-
-			$('option').each(function(i , elem)
-			{
-				if($(this).parent().attr('name') == 'dora' &&
-					$(this).attr('value').length > 0 &&
-					$(this).attr('value') != '-1')
-				{
-					var dora = $(this).text();
-					var value = $(this).attr('value');
-					majors.push( { major: dora + i, value: val });
-				}
-			});
-
-			for(var z = 0; z < majors.length; z++)
-			{
-				majors[z].value = majors[z].value.replace('/','*');
-			}
+			var majors = getMajors(html);
 
 			if(majors.length > 0)
 			{
@@ -88,10 +44,9 @@ app.get('/:school/majors', function(req, res)
 			}
 			else
 			{
-				var err3 = { error: "Error with school name" };
-				res.send(JSON.stringify(err3));
+				var err2 = { error: "Error with school name" };
+				res.send(JSON.stringify(err2));
 			}
-
 		}
 		else
 		{
@@ -107,7 +62,6 @@ app.get('/:school/:dora/classes', function(req, res)
 	var school = req.params.school;
 	var dora = req.params.dora;
 	dora = dora.replace('*','%2F');
-	var aay = '15-16';
 
 	// Get the aay value.
 	var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1';
@@ -115,15 +69,7 @@ app.get('/:school/:dora/classes', function(req, res)
 	{
 		if(!error)
 		{
-			var $ = cheerio.load(html);
-			$('input').each(function(i, elem)
-			{
-				if($(this).parent().attr('name') == 'major' &&
-					$(this).attr('name') == 'aay')
-				{
-					aay = $(this).attr('value');
-				}
-			});
+			var aay = getAay(html);
 
 			// Get the iframe.
 			var url2 = 'http://www.assist.org/web-assist/report.do?agreement=aa&reportPath=REPORT_2&reportScript=Rep2.pl&event=19&dir=1&sia=DAC&ria='+school+'&ia=DAC&oia='+school+'&aay='+aay+'&ay=15-16&dora='+dora;
@@ -132,12 +78,7 @@ app.get('/:school/:dora/classes', function(req, res)
 			{
 				if(!error)
 				{
-					var $ = cheerio.load(html);
-					var url3;
-					$('iframe').each(function(i, elem)
-					{
-						url3 = $(this).attr('src');
-					});
+					var url3 = getIframe(html);
 
 					// The iframe data.
 					request(url3, function(error, response, html)
@@ -166,6 +107,93 @@ app.get('/:school/:dora/classes', function(req, res)
 		}
 	});
 });
+
+function getSchools(html)
+{
+	var $ = cheerio.load(html);
+	var schools = [];
+
+  $('option').each(function(i, elem)
+  {
+  	if($(this).parent().attr('id') == 'oia' && i != 188)
+  	{
+  		var school = $(this).text();
+  		school = school.replace('To:', '').trim();
+  		var value = $(this).attr('value');
+  		var url = require("url");
+			value = url.parse(value, true).query.oia;
+  	 	schools.push( { school: school, value: value} );
+  	}
+  });
+
+  return schools;
+}
+
+function getMajors(html)
+{
+	var $ = cheerio.load(html);
+	var majors = [];
+
+	$('#title').each(function(i, elem)
+	{
+		if($(this).text().indexOf("By Major") > -1 &&
+			$(this).text().indexOf("Not Available") > -1)
+		{
+			var err = { error: "Major not available for this school" };
+			res.end(JSON.stringify(err));
+			return;
+		}
+	});
+
+	$('option').each(function(i , elem)
+	{
+		if($(this).parent().attr('name') == 'dora' &&
+			$(this).attr('value').length > 0 &&
+			$(this).attr('value') != '-1')
+		{
+			var dora = $(this).text();
+			var value = $(this).attr('value');
+			majors.push( { major: dora + i, value: value });
+		}
+	});
+
+	for(var z = 0; z < majors.length; z++)
+	{
+		majors[z].value = majors[z].value.replace('/','*');
+	}
+
+	return majors;
+}
+
+function getAay(html)
+{
+	var aay = '15-16';
+	var $ = cheerio.load(html);
+
+	$('input').each(function(i, elem)
+	{
+		if($(this).parent().attr('name') == 'major' &&
+			$(this).attr('name') == 'aay')
+		{
+			aay = $(this).attr('value');
+		}
+	});
+
+	return aay;
+}
+
+function getIframe(html)
+{
+	var url;
+	var $ = cheerio.load(html);
+
+	$('iframe').each(function(i, elem)
+	{
+		url = $(this).attr('src');
+	});
+
+	return url;
+}
 
 function getCourses(text)
 {
@@ -197,7 +225,8 @@ function getCourses(text)
 				fromCourse += course[i];
 			}
 		}
-		result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
+		result.push({ toCourse: toCourse, fromCourse: fromCourse });
+		// result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
 		toCourse = '';
 		fromCourse = '';
 		from = !from;
