@@ -5,6 +5,21 @@ var cheerio = require('cheerio');
 var app     = express.Router();
 var url 		= require('url');
 
+var conjunctions =
+{
+	andEither : ' AND EITHER ',
+	or 				: ' OR ',
+	and 			: ' AND ',
+	amp 			: ' & '
+};
+
+var notArticulated 	=
+[
+	'no course articulated',
+	'not articulated',
+	'no comparable lab'
+];
+
 // Displays the schools available to transfer to from De Anza College.
 app.get('/schools', function(req, res)
 {
@@ -73,7 +88,6 @@ app.get('/:school/:dora/classes', function(req, res)
 
 			// Get the iframe.
 			var url2 = 'http://www.assist.org/web-assist/report.do?agreement=aa&reportPath=REPORT_2&reportScript=Rep2.pl&event=19&dir=1&sia=DAC&ria='+school+'&ia=DAC&oia='+school+'&aay='+aay+'&ay=15-16&dora='+dora;
-			console.log('url2 = ' + url2);
 			request(url2, function(error, response, html)
 			{
 				if(!error)
@@ -199,12 +213,15 @@ function getCourses(text)
 {
 	text = text.replace(/  +/g, ' ');
 	var result = [];
-	var courses = [];
-	courses = text.match(/---([^-]+)\|([^-]+)---/g);
-
 	var from = true;
 	var fromCourse = '';
 	var toCourse = '';
+	var courses = [];
+
+	// Splits the text into course boxes.
+	courses = text.match(/---([^-]+)\|([^-]+)---/g);
+
+	// Split each box into from and to.
 	courses.forEach(function(course)
 	{
 		course = course.slice(3, -3);
@@ -212,8 +229,8 @@ function getCourses(text)
 		{
 			if (course[i] == '|' || course[i] == '\n')
 			{
-				toCourse += ' ';
-				fromCourse += ' ';
+				toCourse += '\n';
+				fromCourse += '\n';
 				from = !from;
 			}
 			else if (!from)
@@ -225,8 +242,7 @@ function getCourses(text)
 				fromCourse += course[i];
 			}
 		}
-		result.push({ toCourse: toCourse, fromCourse: fromCourse });
-		// result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
+		result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
 		toCourse = '';
 		fromCourse = '';
 		from = !from;
@@ -236,68 +252,107 @@ function getCourses(text)
 
 function parseCourse(text)
 {
-	var notArticulated 	= 'no course articulated';
-	var notArticulated2 = 'not articulated';
-	var notArticulated3 = 'no comparable lab';
-
-	if (text.toLowerCase().indexOf(notArticulated) > -1 ||
-		text.toLowerCase().indexOf(notArticulated2) > -1 ||
-		text.toLowerCase().indexOf(notArticulated3) > -1)
+	// If course not articulated, result is empty.
+	if (text.toLowerCase().indexOf(notArticulated[0]) > -1 ||
+		text.toLowerCase().indexOf(notArticulated[1]) > -1 ||
+		text.toLowerCase().indexOf(notArticulated[2]) > -1)
 	{
 		return [];
 	}
-	var result = [];
 
-	var or = text.split('OR');
-	or.forEach(function(orSplit)
-	{
-		if (text.indexOf('OR') > -1)
-		{
-			result.push({ or: getOrSplitted(orSplit) });
-		}
-		else
-		{
-			result.push(getOrSplitted(orSplit));
-		}
-	});
-	return result;
-}
-
-function getOrSplitted(orSplit)
-{
-	var amp = orSplit.replace(/(.*&.*\([0-9]\).*)( [A-Z][A-Z]+.*\([0-9]\))/, '$1|$2')
-		.split('|');
-	var result = [];
-
-	amp.forEach(function(ampSplit)
-	{
-		if (orSplit.indexOf('&') > -1)
-		{
-			result.push({ and: getAmpSplitted(ampSplit) });
-		}
-		else
-		{
-			result.push(getAmpSplitted(ampSplit));
-		}
-	});
-	return result;
-}
-
-function getAmpSplitted(ampSplit)
-{
-	var ampRemovedSplit;
-	var unit;
-	var code;
-	var title;
-
-	ampRemovedSplit = ampSplit.replace('&', '');
-	unit = ampRemovedSplit.match(/(\([0-9]+\))/)[0].slice(1, -1);
-	code = ampRemovedSplit.match(/\w[a-zA-Z ]+ \d+\w*/)[0];
-	title = ampRemovedSplit.replace(unit, '')
-		.replace(code, '')
-		.replace(/[^\w\s]+/, ' ')
+	// Splits each course using the units as a marker for the starting line.
+	// Conjunction is for course after current.
+	var courses = text.replace(/(\(\d*\).|\n*)(^.*\(\d*\))/mg, '$1|$2')
 		.replace(/\s\s+/g, ' ')
-		.trim();
+		.trim()
+		.split('|')
+		.filter(function(course)
+		{
+			return course !== '' && course !== '\n';
+		});
+
+	// Move & to end of line.
+	courses.forEach(function(elem, i, arr)
+	{
+		arr[i] = elem.replace(/(.*)&(.*)/, '$1$2 &');
+	})
+
+	return conjunctionSplit(courses);
+}
+
+function conjunctionSplit(array)
+{
+	var result = [];
+	var line = array.join(' ');
+
+	if (line.indexOf(conjunctions.andEither) > -1)
+	{
+		// More complicated...
+	}
+	else if (line.indexOf(conjunctions.or) > -1)
+	{
+		result.push({ or: getOrSplitted(line) });
+	}
+	else if (line.indexOf(conjunctions.and) > -1)
+	{
+		// TODO.
+	}
+	else if (line.indexOf(conjunctions.amp) > -1)
+	{
+		result.push({ amp: getAmpSplitted(line) });
+	}
+	else
+	{
+		result.push(parseCourseData(line));
+	}
+	return result;
+}
+
+function getOrSplitted(line)
+{
+	var result = [];
+	var orSplitted = line.split(conjunctions.or);
+	orSplitted.forEach(function(elem)
+	{
+		if (elem.indexOf(conjunctions.amp) > -1)
+		{
+			result.push({ amp: getAmpSplitted(elem) });
+		}
+		else
+		{
+			result.push(parseCourseData(elem));
+		}
+	});
+	return result;
+}
+
+function getAmpSplitted(line)
+{
+	var result = [];
+	var ampSplitted = line.split(conjunctions.amp);
+	ampSplitted.forEach(function(elem)
+	{
+		result.push(parseCourseData(elem));
+	});
+	return result;
+}
+
+function parseCourseData(line)
+{
+	var unit = line.match(/\(\d+\.?\d*\)/);
+	var code = code = line.replace(/(^.+?[0-9]+.*?)\s.+/, '$1');
+	var title;
+	if (unit)
+	{
+		unit = unit[0];
+
+		title = line.replace(unit, '')
+			.replace(code, '')
+			.replace(/\s\s+/g, ' ')
+			.trim();
+		unit = unit.slice(1, -1);
+		code = code.replace(/\s\s+/g, ' ');
+	}
 
 	return { code: code, title: title, unit: unit };
 }
