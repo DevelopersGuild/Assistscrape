@@ -2,8 +2,7 @@
 * Current list of errors:
 *
 * UCDSVM/SVM.PREREQ/classes -> No Boxes
-* CSUSB/LBST BA GT/classes -> Notes outside of course box (ie. Select one from the following.)
-* UCLA/COM STD/classes -> Notes within course box with no course (ie. Three additional courses from)
+* CSUSB/LBST BA GT/classes -> Courses missing
 *
 */
 
@@ -21,15 +20,6 @@ var conjunctions =
   and       : ' AND ',
   amp       : ' & '
 };
-
-var notArticulated  =
-[
-  'no course articulated',
-  'not articulated',
-  'no comparable lab',
-  'no comparable courses',
-  'this course is never articulated'
-];
 
 // Displays the schools available to transfer to from De Anza College.
 function getSchools(req, res)
@@ -222,18 +212,20 @@ function getCourses(text)
 {
   text = text.replace(/  +/g, ' ');
   var result = [];
-  var from = true;
+  var from = false;
   var fromCourse = '';
   var toCourse = '';
   var courses = [];
 
   // Splits the text into course boxes.
-  courses = text.match(/---([^-]+)\|([^-]+)---/g);
+  courses = text.match(/---[^-]+\|[^-]+---/g);
 
   // Split each box into from and to.
   courses.forEach(function(course)
   {
-    course = course.slice(3, -3);
+    // Remove dashes and extra notes.
+    course = course.replace(/---[^-]*?\n(.*\|[^-]+)---/g, '$1').trim();
+
     for (var i = 0; i < course.length; ++i)
     {
       if (course[i] == '|' || course[i] == '\n')
@@ -251,7 +243,11 @@ function getCourses(text)
         fromCourse += course[i];
       }
     }
-    result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
+
+    if (/\(\d+\.?\d*\)/.test(toCourse) || /\(\d+\.?\d*\)/.test(fromCourse) || !isArticulated(toCourse) || !isArticulated(fromCourse))
+    {
+      result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
+    }
     toCourse = '';
     fromCourse = '';
     from = !from;
@@ -263,7 +259,7 @@ function parseCourse(text)
 {
   // Splits each course using the units as a marker for the starting line.
   // Conjunction is for course after current.
-  var courses = text.replace(/(\(\d+\.?\d*\).|\n*)(^.*\(\d+\.?\d*\))/mg, '$1|$2')
+  var courses = text.replace(/(^.*\(\d+\.?\d*\).|\n*)(^.*\(\d+\.?\d*\))/mg, '$1|$2')
     .replace(/\s\s+/g, ' ')
     .trim()
     .split('|')
@@ -276,7 +272,7 @@ function parseCourse(text)
   {
     // Move & to end of line.
     var re = new RegExp('(.*)' + conjunctions.amp + '(.*?\\\(\\\d+\.?\\\d*\\\).*)');
-    arr[i] = elem.replace(re, '$1 $2' + conjunctions.amp + conjunctions.amp);
+    arr[i] = elem.replace(re, '$1 $2' + conjunctions.amp);
   });
 
   return conjunctionSplit(courses);
@@ -314,6 +310,7 @@ function getAndSplitted(line)
 {
   var result = [];
   var andSplitted = line.split(conjunctions.and);
+
   andSplitted.forEach(function(elem)
   {
     if (elem.indexOf(conjunctions.or) > -1)
@@ -326,7 +323,7 @@ function getAndSplitted(line)
     }
     else
     {
-      result.push(parseCourseData(elem));
+        result.push(parseCourseData(elem));
     }
   });
   return result;
@@ -336,6 +333,7 @@ function getOrSplitted(line)
 {
   var result = [];
   var orSplitted = line.split(conjunctions.or);
+
   orSplitted.forEach(function(elem)
   {
     if (elem.indexOf(conjunctions.amp) > -1)
@@ -353,7 +351,8 @@ function getOrSplitted(line)
 function getAmpSplitted(line)
 {
   var result = [];
-  var ampSplitted = line.split(conjunctions.amp + conjunctions.amp);
+  var ampSplitted = line.split(conjunctions.amp);
+  var course;
   ampSplitted.forEach(function(elem)
   {
     result.push(parseCourseData(elem));
@@ -364,12 +363,9 @@ function getAmpSplitted(line)
 function parseCourseData(line)
 {
   // If course not articulated, result is empty.
-  for (var j = 0; j < notArticulated.length; ++j)
+  if (!isArticulated(line))
   {
-    if (line.toLowerCase().indexOf(notArticulated[j]) > -1)
-    {
-      return;
-    }
+    return;
   }
 
   var unit = line.match(/\(\d+\.?\d*\)/);
@@ -385,11 +381,33 @@ function parseCourseData(line)
       .trim();
     unit = unit.slice(1, -1).trim();
     code = code.replace(/\s\s+/g, ' ').trim();
-  }
 
-  return { code: code, title: title, unit: unit };
+    return { code: code, title: title, unit: unit };
+  }
+  return;
 }
 
+function isArticulated(line)
+{
+  var notArticulated  =
+  [
+    'no course articulated',
+    'no articulation',
+    'not articulated',
+    'no comparable lab',
+    'no comparable courses',
+    'this course is never articulated'
+  ];
+
+  for (var i = 0; i < notArticulated.length; ++i)
+  {
+    if (line.toLowerCase().indexOf(notArticulated[i]) > -1)
+    {
+      return false;
+    }
+  }
+  return true;
+}
 app.get('/schools', getSchools);
 app.get('/:school/majors', getMajors);
 app.get('/:school/:dora/classes', getClasses);
