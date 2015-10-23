@@ -13,6 +13,7 @@ var cheerio = require('cheerio');
 var url     = require('url');
 var app     = express.Router();
 
+// Conjunctions that are found within a course box.
 var conjunctions =
 {
   andEither : ' AND EITHER ',
@@ -21,57 +22,108 @@ var conjunctions =
   amp       : ' & '
 };
 
-// Displays the schools available to transfer to from De Anza College.
-function getSchools(req, res)
+/**~*~*
+  Gets the list of available institutions.
+*~**/
+function get_ias(req, res)
 {
-  var url = 'http://www.assist.org/web-assist/DAC.html';
+  var url = 'http://www.assist.org/web-assist/welcome.html';
 
   request(url, function(error, response, html)
   {
-    if(!error)
+    if (!error)
     {
       var $ = cheerio.load(html);
-      var schools = [];
+      var ias = [];
 
-      $('option').each(function(i, elem)
+      $('option').each(function(i)
       {
-        if($(this).parent().attr('id') == 'oia' && i != 188)
+
+        // Index i === 0 is default value.
+        if($(this).parent().attr('name') == 'ia' && i !== 0)
         {
-          var school = $(this).text();
-          school = school.replace('To:', '').trim();
-          var value = $(this).attr('value');
-          var url = require("url");
-          value = url.parse(value, true).query.oia;
-          schools.push( { school: school, value: value} );
+          var ia = $(this).text();
+
+          // Get rid of .html extension.
+          var value = $(this).attr('value')
+            .slice(0, -5);
+          ias.push( { name: ia, value: value });
         }
       });
-
-      res.send(JSON.stringify(schools));
+      res.send(JSON.stringify(ias));
     }
     else
     {
       res.send(JSON.stringify(
       {
-        error: "Error with parsing"
+        error: "Error with parsing."
       }));
     }
   });
 }
 
-// Displays the majors available at the transfer school.
-function getMajors(req, res)
+/**~*~*
+  Gets the list of transferable institutions from the selected institution.
+*~**/
+function get_oias(req, res)
 {
-  var school = req.params.school;
-  var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1';
+  var ia = req.params.ia;
+  var url = 'http://www.assist.org/web-assist/'+ia+'.html';
 
   request(url, function(error, response, html)
   {
-    if(!error)
+    if (!error)
+    {
+      var $ = cheerio.load(html);
+      var oias = [];
+
+      $('option').each(function(i)
+      {
+        if($(this).parent().attr('id') == 'oia' && i != 188)
+        {
+          var oia = $(this).text();
+          if (oia.indexOf('To:') > -1)
+          {
+            // Some oias have a 'From' field which modifies the ia property of the URL.
+            oia = oia.replace('To:', '').trim();
+            
+            // Grab only the oia property of the URL in value.
+            var value = $(this).attr('value');
+            var url = require("url");
+            value = url.parse(value, true).query.oia;
+            oias.push( { name: oia, value: value} );
+          }
+        }
+      });
+      res.send(JSON.stringify(oias));
+    }
+    else
+    {
+      res.send(JSON.stringify(
+      {
+        error: "Error with parsing."
+      }));
+    }
+  });
+}
+
+/**~*~*
+  Gets the majors available at oia.
+*~**/
+function get_doras(req, res)
+{
+  var ia = req.params.ia;
+  var oia = req.params.oia;
+  var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia='+ia+'&ay=15-16&oia='+oia+'&dir=1';
+
+  request(url, function(error, response, html)
+  {
+    if (!error)
     {
       var $ = cheerio.load(html);
       var majors = [];
 
-      $('#title').each(function(i, elem)
+      $('#title').each(function()
       {
         if($(this).text().indexOf("By Major") > -1 &&
           $(this).text().indexOf("Not Available") > -1)
@@ -83,7 +135,7 @@ function getMajors(req, res)
         }
       });
 
-      $('option').each(function(i , elem)
+      $('option').each(function()
       {
         if($(this).parent().parent().attr('name') == 'major' &&
           $(this).parent().attr('name') == 'dora' &&
@@ -123,15 +175,18 @@ function getMajors(req, res)
   });
 }
 
-// Displays the courses at De Anza College and its articulated course at transfer school.
-function getClasses(req, res)
+/**~*~*
+  Gets the courses articulated between ia and oia.
+*~**/
+function getCourses(req, res)
 {
-  var school = req.params.school;
+  var ia = req.params.ia;
+  var oia = req.params.oia;
   var dora = req.params.dora;
   dora = dora.replace('*','%2F');
 
   // Get the aay value.
-  var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia=DAC&ay=15-16&oia='+school+'&dir=1';
+  var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia='+ia+'&ay=15-16&oia='+oia+'&dir=1';
   request(url, function(error, response, html)
   {
     if(!error)
@@ -139,7 +194,7 @@ function getClasses(req, res)
       var aay = getAay(html);
 
       // Get the iframe.
-      var url2 = 'http://www.assist.org/web-assist/report.do?agreement=aa&reportPath=REPORT_2&reportScript=Rep2.pl&event=19&dir=1&sia=DAC&ria='+school+'&ia=DAC&oia='+school+'&aay='+aay+'&ay=15-16&dora='+dora;
+      var url2 = 'http://www.assist.org/web-assist/report.do?agreement=aa&reportPath=REPORT_2&reportScript=Rep2.pl&event=19&dir=1&sia='+ia+'&ria='+oia+'&ia='+ia+'&oia='+oia+'&aay='+aay+'&ay=15-16&dora='+dora;
       request(url2, function(error, response, html)
       {
         if(!error)
@@ -154,7 +209,7 @@ function getClasses(req, res)
               var text = $('body').text();
               res.send(
               {
-                "data": getCourses(text)
+                "data": getArticulations(text)
               });
             }
             else
@@ -178,6 +233,9 @@ function getClasses(req, res)
   });
 }
 
+/**~*~*
+  Gets the aay value for institutions that have an older articulation agreement.
+*~**/
 function getAay(html)
 {
   var aay = '15-16';
@@ -195,6 +253,9 @@ function getAay(html)
   return aay;
 }
 
+/**~*~*
+  Gets the iframe that contains the articulation agreement between the two institutions.
+*~**/
 function getIframe(html)
 {
   var url;
@@ -208,13 +269,16 @@ function getIframe(html)
   return url;
 }
 
-function getCourses(text)
+/**~*~*
+  Gets the articulated courses from the two institutions.
+*~**/
+function getArticulations(text)
 {
   text = text.replace(/  +/g, ' ');
   var result = [];
   var from = false;
-  var fromCourse = '';
-  var toCourse = '';
+  var iaCourse = '';
+  var oiaCourse = '';
   var courses = [];
 
   // Splits the text into course boxes.
@@ -230,35 +294,37 @@ function getCourses(text)
     {
       if (course[i] == '|' || course[i] == '\n')
       {
-        toCourse += '\n';
-        fromCourse += '\n';
+        oiaCourse += '\n';
+        iaCourse += '\n';
         from = !from;
       }
       else if (!from)
       {
-        toCourse += course[i];
+        oiaCourse += course[i];
       }
       else if (from)
       {
-        fromCourse += course[i];
+        iaCourse += course[i];
       }
     }
 
-    if (/\(\d+\.?\d*\)/.test(toCourse) || /\(\d+\.?\d*\)/.test(fromCourse) || !isArticulated(toCourse) || !isArticulated(fromCourse))
+    if (/\(\d+\.?\d*\)/.test(oiaCourse) || /\(\d+\.?\d*\)/.test(iaCourse) || !isArticulated(oiaCourse) || !isArticulated(iaCourse))
     {
-      result.push({ toCourse: parseCourse(toCourse), fromCourse: parseCourse(fromCourse) });
+      result.push({ iaCourse: parseCourse(iaCourse), oiaCourse: parseCourse(oiaCourse) });
     }
-    toCourse = '';
-    fromCourse = '';
+    oiaCourse = '';
+    iaCourse = '';
     from = !from;
   });
   return result;
 }
 
+/**~*~*
+  Extracts the course information from raw course data.
+*~**/
 function parseCourse(text)
 {
   // Splits each course using the units as a marker for the starting line.
-  // Conjunction is for course after current.
   var courses = text.replace(/(^.*\(\d+\.?\d*\).|\n*)(^.*\(\d+\.?\d*\))/mg, '$1|$2')
     .replace(/\s\s+/g, ' ')
     .trim()
@@ -278,6 +344,9 @@ function parseCourse(text)
   return conjunctionSplit(courses);
 }
 
+/**~*~*
+  Splits the courses into individual courses connected by conjunctions.
+*~**/
 function conjunctionSplit(array)
 {
   var result = [];
@@ -408,8 +477,10 @@ function isArticulated(line)
   }
   return true;
 }
-app.get('/schools', getSchools);
-app.get('/:school/majors', getMajors);
-app.get('/:school/:dora/classes', getClasses);
+
+app.get('/ias', get_ias);
+app.get('/:ia/oias', get_oias);
+app.get('/:ia/:oia/dora', get_doras);
+app.get('/:ia/:oia/:dora/courses', getCourses);
 
 module.exports = app;
