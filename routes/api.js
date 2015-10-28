@@ -48,7 +48,7 @@ function get_all_ias(callback)
             var value = $(this).attr('value')
               .slice(0, -5);
             ias.push( { name: ia, value: value });
-        }s
+        }
         });
         callback(null, ias);
       }
