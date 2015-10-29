@@ -26,7 +26,7 @@ var conjunctions =
 };
 
 
-function get_all_ias(callback)
+function get_all_ias(req, res)
 {
     var url = 'http://www.assist.org/web-assist/welcome.html';
     request(url, function(error, response, html)
@@ -48,14 +48,14 @@ function get_all_ias(callback)
             var value = $(this).attr('value')
               .slice(0, -5);
             ias.push( { name: ia, value: value });
-        }
+          }
         });
-        callback(null, ias);
+        res.send(JSON.stringify(ias));
       }
       else
       {
           var error = "Error with parsing.";
-          callback(error);
+          res.send(JSON.stringify(error));
       }
     });
 }
@@ -64,13 +64,7 @@ function get_all_ias(callback)
 *~**/
 function get_ias(req, res)
 {
-    var err, ias = get_all_ias();
-    if (err)
-    {
-        res.send(JSON.stringify(err));
-        return;
-    }
-    res.send(JSON.stringify(ias));
+    get_all_ias(req, res);
 }
 
 /**~*~*
@@ -79,15 +73,10 @@ function get_ias(req, res)
 function get_oias(req, res)
 {
   var ia = req.params.ia;
-  var err, oias = get_all_oias(ia);
-  if (err){
-      res.send(JSON.stringify(err));
-      return;
-  }
-  res.send(JSON.stringify(oias));
+  get_all_oias(req, res, ia);
 }
 
-function get_all_oias(ia)
+function get_all_oias(req, res, ia)
 {
     var url = 'http://www.assist.org/web-assist/'+ia+'.html';
 
@@ -116,12 +105,12 @@ function get_all_oias(ia)
             }
           }
         });
-        return oias;
+        res.send(JSON.stringify(oias));
       }
       else
       {
           var error = "Error with parsing.";
-          return error;
+          res.send(JSON.stringify(err));
       }
     });
 }
@@ -134,16 +123,10 @@ function get_doras(req, res)
   var ia = req.params.ia;
   var oia = req.params.oia;
 
-  var err, majors = get_all_dora(ia, oia);
-  if (err)
-  {
-      res.send(JSON.stringify(err));
-      return;
-  }
-  res.send(JSON.stringify(majors));
+  get_all_dora(req, res, ia, oia);
 }
 
-function get_all_dora(ia, oia)
+function get_all_dora(req, res, ia, oia)
 {
     var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia='+ia+'&ay=15-16&oia='+oia+'&dir=1';
 
@@ -184,18 +167,18 @@ function get_all_dora(ia, oia)
 
         if(majors.length > 0)
         {
-          return null, majors;
+            res.send(JSON.stringify(majors));
         }
         else
         {
             var error1 = "Error with school name";
-            return error1;
+            res.send(JSON.stringify(error1));
         }
       }
       else
       {
           var error2 = "Error with school name";
-          return error2;
+          res.send(JSON.stringify(error2));
       }
     });
 }
@@ -210,16 +193,11 @@ function getCourses(req, res)
   var dora = req.params.dora;
   dora = dora.replace('*','%2F');
 
-  var err, data = getAllCourses(ia, oia, dora);
-  if (err)
-  {
-      res.send(JSON.stringify(err));
-      return;
-  }
-  res.send(JSON.stringify(data));
+  getAllCourses(req, res, ia, oia, dora);
+
 }
 
-function getAllCourses(ia, oia, dora)
+function getAllCourses(req, res, ia, oia, dora)
 {
     // Get the aay value.
     var url = 'http://www.assist.org/web-assist/articulationAgreement.do?inst1=none&inst2=none&ia='+ia+'&ay=15-16&oia='+oia+'&dir=1';
@@ -244,19 +222,19 @@ function getAllCourses(ia, oia, dora)
                 var $ = cheerio.load(html);
                 var text = $('body').text();
 
-                return getArticulations(text);
+                res.send(JSON.stringify(getArticulations(text)));
               }
               else
               {
                   var error1 = "Error with major name";
-                  return error1;
+                  res.send(JSON.stringify(error1));
               }
             });
           }
           else
           {
               var error2 = "Error with school name";
-              return error2;
+              res.send(JSON.stringify(error2));
           }
         });
       }
